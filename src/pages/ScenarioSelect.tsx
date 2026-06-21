@@ -28,6 +28,11 @@ import {
   GraduationCap,
   Crosshair,
   ClipboardCheck,
+  UserPlus,
+  User,
+  UserCheck,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react'
 import { scenarios } from '@/data/scenarios'
 import type {
@@ -35,6 +40,7 @@ import type {
   TrainingRecord,
   InProgressState,
   TrainingMode,
+  Trainee,
 } from '@/data/types'
 import { trainingModeLabels, trainingModeDescriptions } from '@/data/types'
 import { useStore } from '@/store/useStore'
@@ -103,7 +109,8 @@ const modeColors: Record<TrainingMode, { bg: string; border: string; text: strin
 }
 
 type ScoreFilter = 'all' | '>=80' | '60-79' | '<60'
-type ScenarioFilter = string // 'all' or scenarioId
+type ScenarioFilter = string
+type TraineeFilter = string
 
 function ScenarioCard({
   scenario,
@@ -257,6 +264,113 @@ function ScenarioCard({
   )
 }
 
+function TraineeSelector() {
+  const trainees = useStore((s) => s.trainees)
+  const currentTraineeId = useStore((s) => s.currentTraineeId)
+  const addTrainee = useStore((s) => s.addTrainee)
+  const removeTrainee = useStore((s) => s.removeTrainee)
+  const setCurrentTrainee = useStore((s) => s.setCurrentTrainee)
+
+  const [newName, setNewName] = useState('')
+  const [showInput, setShowInput] = useState(false)
+
+  const handleAdd = () => {
+    const trimmed = newName.trim()
+    if (!trimmed) return
+    addTrainee(trimmed)
+    setNewName('')
+    setShowInput(false)
+  }
+
+  return (
+    <div className="mb-8 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Users className="h-5 w-5 text-[#2B5EA7]" />
+          <h2 className="text-base font-semibold text-[#4A4A4A]">带教班组</h2>
+        </div>
+        <button
+          onClick={() => setShowInput(!showInput)}
+          className="flex items-center gap-1 rounded-md bg-[#2B5EA7]/10 px-2.5 py-1 text-xs font-medium text-[#2B5EA7] transition-colors hover:bg-[#2B5EA7]/20"
+        >
+          <UserPlus className="h-3.5 w-3.5" />
+          新增学员
+        </button>
+      </div>
+
+      {showInput && (
+        <div className="mb-3 flex gap-2">
+          <input
+            type="text"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+            placeholder="输入学员姓名..."
+            className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-[#4A4A4A] placeholder-gray-400 focus:border-[#2B5EA7] focus:outline-none focus:ring-1 focus:ring-[#2B5EA7]/30"
+            autoFocus
+          />
+          <button
+            onClick={handleAdd}
+            disabled={!newName.trim()}
+            className="rounded-lg bg-[#2B5EA7] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#234d87] disabled:cursor-not-allowed disabled:bg-gray-300"
+          >
+            添加
+          </button>
+          <button
+            onClick={() => setShowInput(false)}
+            className="rounded-lg bg-gray-200 px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-300"
+          >
+            取消
+          </button>
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => setCurrentTrainee(null)}
+          className={cn(
+            'flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors',
+            currentTraineeId === null
+              ? 'border-[#FF6B35] bg-orange-50 text-[#FF6B35]'
+              : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
+          )}
+        >
+          <User className="h-3.5 w-3.5" />
+          未指定
+        </button>
+        {trainees.map((t) => (
+          <div
+            key={t.id}
+            className={cn(
+              'group flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors',
+              currentTraineeId === t.id
+                ? 'border-[#FF6B35] bg-orange-50 text-[#FF6B35]'
+                : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+            )}
+          >
+            <button
+              onClick={() => setCurrentTrainee(t.id)}
+              className="flex items-center gap-1.5"
+            >
+              <UserCheck className="h-3.5 w-3.5" />
+              {t.name}
+            </button>
+            <button
+              onClick={() => removeTrainee(t.id)}
+              className="ml-1 opacity-0 text-gray-400 transition-opacity hover:text-red-500 group-hover:opacity-100"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ))}
+        {trainees.length === 0 && (
+          <p className="py-2 text-sm text-gray-400">还未添加学员，点击"新增学员"录入班组人员</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function TrainingModeSelector() {
   const trainingMode = useStore((s) => s.trainingMode)
   const setTrainingMode = useStore((s) => s.setTrainingMode)
@@ -316,8 +430,10 @@ function HistoryPanel({
   records: TrainingRecord[]
   onViewRecord: (recordId: string) => void
 }) {
+  const trainees = useStore((s) => s.trainees)
   const [scenarioFilter, setScenarioFilter] = useState<ScenarioFilter>('all')
   const [scoreFilter, setScoreFilter] = useState<ScoreFilter>('all')
+  const [traineeFilter, setTraineeFilter] = useState<TraineeFilter>('all')
   const [showFilter, setShowFilter] = useState(false)
 
   const filteredRecords = useMemo(() => {
@@ -326,9 +442,11 @@ function HistoryPanel({
       if (scoreFilter === '>=80' && r.score < 80) return false
       if (scoreFilter === '60-79' && (r.score < 60 || r.score >= 80)) return false
       if (scoreFilter === '<60' && r.score >= 60) return false
+      if (traineeFilter === 'none' && r.traineeId !== null) return false
+      if (traineeFilter !== 'all' && traineeFilter !== 'none' && r.traineeId !== traineeFilter) return false
       return true
     })
-  }, [records, scenarioFilter, scoreFilter])
+  }, [records, scenarioFilter, scoreFilter, traineeFilter])
 
   if (records.length === 0) {
     return (
@@ -358,6 +476,47 @@ function HistoryPanel({
       {showFilter && (
         <div className="border-b border-gray-100 bg-[#F5F5F0]/50 px-4 py-3">
           <div className="space-y-3">
+            <div>
+              <p className="mb-1.5 text-[11px] font-medium text-gray-500">按学员筛选</p>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  onClick={() => setTraineeFilter('all')}
+                  className={cn(
+                    'rounded-md px-2.5 py-1 text-xs transition-colors',
+                    traineeFilter === 'all'
+                      ? 'bg-[#2B5EA7] text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-100'
+                  )}
+                >
+                  全部
+                </button>
+                <button
+                  onClick={() => setTraineeFilter('none')}
+                  className={cn(
+                    'rounded-md px-2.5 py-1 text-xs transition-colors',
+                    traineeFilter === 'none'
+                      ? 'bg-[#2B5EA7] text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-100'
+                  )}
+                >
+                  未指定
+                </button>
+                {trainees.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setTraineeFilter(t.id)}
+                    className={cn(
+                      'rounded-md px-2.5 py-1 text-xs transition-colors',
+                      traineeFilter === t.id
+                        ? 'bg-[#2B5EA7] text-white'
+                        : 'bg-white text-gray-600 hover:bg-gray-100'
+                    )}
+                  >
+                    {t.name}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div>
               <p className="mb-1.5 text-[11px] font-medium text-gray-500">按场景筛选</p>
               <div className="flex flex-wrap gap-1.5">
@@ -420,7 +579,7 @@ function HistoryPanel({
             没有符合筛选条件的记录
           </div>
         ) : (
-          filteredRecords.slice(0, 8).map((record) => (
+          filteredRecords.slice(0, 10).map((record) => (
             <button
               key={record.id}
               onClick={() => onViewRecord(record.id)}
@@ -435,7 +594,7 @@ function HistoryPanel({
                 <FileText className={cn('h-5 w-5', getScoreColor(record.score))} />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-sm font-medium text-[#4A4A4A] truncate">{record.scenarioName}</p>
                   <span
                     className={cn(
@@ -446,6 +605,24 @@ function HistoryPanel({
                   >
                     {trainingModeLabels[record.mode]}
                   </span>
+                  {record.traineeName && (
+                    <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
+                      {record.traineeName}
+                    </span>
+                  )}
+                  {record.teacherComment && (
+                    record.teacherComment.passed ? (
+                      <span className="flex items-center gap-0.5 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700">
+                        <CheckCircle2 className="h-2.5 w-2.5" />
+                        通过
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-0.5 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700">
+                        <XCircle className="h-2.5 w-2.5" />
+                        待改进
+                      </span>
+                    )
+                  )}
                 </div>
                 <p className="text-xs text-gray-400">
                   {formatDate(record.completedAt)} · {record.totalEvents}题 · 用时{formatDuration(record.totalTime)}
@@ -474,13 +651,16 @@ export default function ScenarioSelect() {
     inProgressState,
     initFromStorage,
     loadTrainingRecord,
-    restartScenario,
     clearInProgress,
+    currentTraineeId,
+    trainees,
   } = useStore()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [exitingId, setExitingId] = useState<string | null>(null)
   const [showResumeModal, setShowResumeModal] = useState(false)
   const [pendingScenarioId, setPendingScenarioId] = useState<string | null>(null)
+
+  const currentTrainee = trainees.find((t) => t.id === currentTraineeId)
 
   useEffect(() => {
     initFromStorage()
@@ -551,11 +731,14 @@ export default function ScenarioSelect() {
             混凝土浇筑旁站情景练习
           </h1>
           <p className="mt-3 text-base text-gray-500 sm:text-lg">
-            选择训练模式和浇筑场景，开始旁站训练
+            {currentTrainee
+              ? `当前学员：${currentTrainee.name}，选择训练模式和浇筑场景`
+              : '选择训练模式和浇筑场景，开始旁站训练'}
           </p>
           <div className="mx-auto mt-4 h-1 w-16 rounded-full bg-[#FF6B35]" />
         </header>
 
+        <TraineeSelector />
         <TrainingModeSelector />
 
         <section className="mb-8">
@@ -588,7 +771,7 @@ export default function ScenarioSelect() {
         <div className="rounded-xl border border-dashed border-gray-300 bg-white/60 px-6 py-4 text-center text-sm text-gray-400 backdrop-blur-sm">
           <p>
             <span className="font-semibold text-[#4A4A4A]">训练流程：</span>
-            选择训练模式 → 选择场景 → 查看现场概况 → 逐题判断旁站要点 → 填写判定依据 → 获取复盘报告
+            录入学员 → 选择训练模式 → 选择场景 → 查看现场概况 → 逐题判断旁站要点 → 填写判定依据 → 获取复盘报告 → 老师点评
           </p>
         </div>
       </div>
@@ -603,7 +786,10 @@ export default function ScenarioSelect() {
               <div className="flex-1">
                 <h3 className="text-base font-semibold text-[#4A4A4A]">检测到未完成的练习</h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  你在「{scenarios.find((s) => s.id === pendingScenarioId)?.name}」场景有未完成的练习，是否继续？
+                  {inProgressState?.traineeName
+                    ? `${inProgressState.traineeName} 在`
+                    : '你在'}
+                  「{scenarios.find((s) => s.id === pendingScenarioId)?.name}」场景有未完成的练习，是否继续？
                 </p>
               </div>
               <button
@@ -617,6 +803,12 @@ export default function ScenarioSelect() {
             {inProgressState && inProgressState.scenarioId === pendingScenarioId && (
               <div className="mb-4 rounded-lg bg-[#F5F5F0] px-4 py-3 text-sm">
                 <div className="flex justify-between">
+                  <span className="text-gray-400">学员</span>
+                  <span className="font-medium text-[#4A4A4A]">
+                    {inProgressState.traineeName || '未指定'}
+                  </span>
+                </div>
+                <div className="mt-1 flex justify-between">
                   <span className="text-gray-400">训练模式</span>
                   <span className="font-medium text-[#4A4A4A]">
                     {trainingModeLabels[inProgressState.mode]}

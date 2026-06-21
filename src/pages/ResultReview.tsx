@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   XCircle,
@@ -20,12 +20,18 @@ import {
   Crosshair,
   ClipboardCheck,
   Check,
-  Square,
   FileSearch,
   Video,
   Wrench,
   ListTodo,
   BarChart3,
+  User,
+  MessageSquare,
+  Printer,
+  Download,
+  ThumbsUp,
+  ThumbsDown,
+  Save,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/store/useStore'
@@ -42,6 +48,7 @@ import type {
   Issue,
   TrainingMode,
   ActionItem,
+  TrainingRecord,
 } from '@/data/types'
 import { getIssuesByCategory } from '@/data/scoring'
 
@@ -106,6 +113,16 @@ function formatDuration(ms: number): string {
 }
 
 function formatDate(timestamp: number): string {
+  const d = new Date(timestamp)
+  const year = d.getFullYear()
+  const month = (d.getMonth() + 1).toString().padStart(2, '0')
+  const day = d.getDate().toString().padStart(2, '0')
+  const hours = d.getHours().toString().padStart(2, '0')
+  const mins = d.getMinutes().toString().padStart(2, '0')
+  return `${year}-${month}-${day} ${hours}:${mins}`
+}
+
+function formatDateShort(timestamp: number): string {
   const d = new Date(timestamp)
   const month = (d.getMonth() + 1).toString().padStart(2, '0')
   const day = d.getDate().toString().padStart(2, '0')
@@ -412,6 +429,352 @@ function ActionItemsChecklist({
   )
 }
 
+function TeacherCommentSection({
+  record,
+  onSave,
+}: {
+  record: TrainingRecord | null
+  onSave: (comment: string, passed: boolean) => void
+}) {
+  const [comment, setComment] = useState(record?.teacherComment?.comment || '')
+  const [passed, setPassed] = useState<boolean>(record?.teacherComment?.passed || false)
+  const [hasChanges, setHasChanges] = useState(false)
+
+  useEffect(() => {
+    setComment(record?.teacherComment?.comment || '')
+    setPassed(record?.teacherComment?.passed || false)
+    setHasChanges(false)
+  }, [record?.id])
+
+  const handleCommentChange = (val: string) => {
+    setComment(val)
+    setHasChanges(true)
+  }
+
+  const handlePassedChange = (val: boolean) => {
+    setPassed(val)
+    setHasChanges(true)
+  }
+
+  const handleSave = () => {
+    onSave(comment, passed)
+    setHasChanges(false)
+  }
+
+  const isReadOnly = !record
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="bg-gradient-to-r from-blue-50 to-transparent px-4 py-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#2B5EA7]/10 text-[#2B5EA7]">
+            <MessageSquare className="h-5 w-5" />
+          </div>
+          <div className="text-left">
+            <p className="text-sm font-semibold text-[#4A4A4A]">老师点评与复盘结论</p>
+            <div className="flex items-center gap-2 text-[11px] text-gray-400">
+              <span>填写点评并标记是否通过</span>
+              {hasChanges && <span className="text-[#FF6B35]">· 有未保存的修改</span>}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-4 pb-4 pt-3">
+        {isReadOnly ? (
+          <div className="rounded-lg bg-gray-100 px-3 py-2 text-xs text-gray-500">
+            完成练习后可填写老师点评
+          </div>
+        ) : (
+          <>
+            <div className="mb-3 flex items-center gap-3">
+              <span className="text-xs text-gray-500">结论：</span>
+              <button
+                type="button"
+                onClick={() => handlePassedChange(true)}
+                className={cn(
+                  'flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+                  passed
+                    ? 'bg-green-100 text-green-700 ring-2 ring-green-300'
+                    : 'bg-gray-100 text-gray-600 hover:bg-green-50 hover:text-green-700'
+                )}
+              >
+                <ThumbsUp className="h-3.5 w-3.5" />
+                通过
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePassedChange(false)}
+                className={cn(
+                  'flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+                  !passed
+                    ? 'bg-red-100 text-red-700 ring-2 ring-red-300'
+                    : 'bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-700'
+                )}
+              >
+                <ThumbsDown className="h-3.5 w-3.5" />
+                待改进
+              </button>
+            </div>
+
+            <textarea
+              value={comment}
+              onChange={(e) => handleCommentChange(e.target.value)}
+              placeholder="填写老师点评，记录本次训练的亮点、不足和改进方向..."
+              rows={3}
+              className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm text-[#4A4A4A] placeholder-gray-400 focus:border-[#2B5EA7] focus:outline-none focus:ring-1 focus:ring-[#2B5EA7]/30"
+            />
+
+            <div className="mt-3 flex items-center justify-between">
+              {record.teacherComment && (
+                <span className="text-[11px] text-gray-400">
+                  上次更新：{formatDate(record.teacherComment.updatedAt)}
+                </span>
+              )}
+              <button
+                onClick={handleSave}
+                disabled={!hasChanges}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-medium transition-colors',
+                  hasChanges
+                    ? 'bg-[#2B5EA7] text-white hover:bg-[#234d87]'
+                    : 'cursor-not-allowed bg-gray-200 text-gray-400'
+                )}
+              >
+                <Save className="h-3.5 w-3.5" />
+                保存点评
+              </button>
+            </div>
+
+            {comment.trim() && (
+              <div className="mt-3 rounded-lg bg-blue-50/60 p-3">
+                <p className="text-xs font-medium text-[#2B5EA7]">预览：</p>
+                <p className="mt-1 text-sm leading-relaxed text-[#4A4A4A]">{comment}</p>
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-xs text-gray-500">结论：</span>
+                  {passed ? (
+                    <span className="flex items-center gap-0.5 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700">
+                      <ThumbsUp className="h-2.5 w-2.5" />
+                      通过
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-0.5 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">
+                      <ThumbsDown className="h-2.5 w-2.5" />
+                      待改进
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ExportPrintButton({
+  record,
+  scenarioName,
+}: {
+  record: TrainingRecord | null
+  scenarioName: string
+}) {
+  const handlePrint = () => {
+    if (!record) return
+
+    const traineeName = record.traineeName || '未指定'
+    const mode = record.mode
+    const totalTime = record.totalTime
+    const completedAt = record.completedAt
+    const score = record.score
+    const issues = record.scoreResult.issues || []
+    const actionItems = record.scoreResult.actionItems || []
+    const teacherComment = record.teacherComment
+    const errors = issues.filter((i) => i.type === 'error')
+    const warnings = issues.filter((i) => i.type === 'warning')
+    const scoreColor = getScoreColor(score)
+    const scoreRating = getScoreRating(score)
+
+    const escapeHtml = (str: string) => {
+      const div = document.createElement('div')
+      div.textContent = str
+      return div.innerHTML
+    }
+
+    let issuesHtml = ''
+    if (errors.length + warnings.length > 0) {
+      issuesHtml += '<h2>旁站问题汇总</h2>'
+      if (errors.length > 0) {
+        issuesHtml += `<h3>错误项（${errors.length}）</h3>`
+        issuesHtml += errors
+          .map(
+            (i) =>
+              `<div class="error"><b>【${categoryLabels[i.category]}】</b>${escapeHtml(i.description)}<br><span style="font-size:11px;color:#999">规范依据：${escapeHtml(i.regulation)}</span></div>`
+          )
+          .join('')
+      }
+      if (warnings.length > 0) {
+        issuesHtml += `<h3>待改进项（${warnings.length}）</h3>`
+        issuesHtml += warnings
+          .map(
+            (i) =>
+              `<div class="warning"><b>【${categoryLabels[i.category]}】</b>${escapeHtml(i.description)}<br><span style="font-size:11px;color:#999">规范依据：${escapeHtml(i.regulation)}</span></div>`
+          )
+          .join('')
+      }
+    }
+
+    let actionItemsHtml = ''
+    if (actionItems.length > 0) {
+      actionItemsHtml += '<h2>整改待办清单</h2>'
+      actionItemsHtml += actionItems
+        .map((a) => {
+          const doneClass = a.completed ? 'action-done' : ''
+          return `
+            <div class="action-item">
+              <div class="action-checkbox"></div>
+              <div>
+                <div class="${doneClass}">
+                  <b>【${actionItemTypeLabels[a.type]}】</b>${escapeHtml(a.title)}
+                </div>
+                <div style="font-size: 11px; color: #666;" class="${doneClass}">${escapeHtml(a.content)}</div>
+              </div>
+            </div>
+          `
+        })
+        .join('')
+    }
+
+    let commentHtml = ''
+    if (teacherComment) {
+      const conclusionClass = teacherComment.passed ? 'conclusion pass' : 'conclusion fail'
+      const conclusionText = teacherComment.passed ? '通过' : '待改进'
+      commentHtml = `
+        <h2>老师点评与结论</h2>
+        <div class="comment">
+          ${teacherComment.comment.split('\n').map((p) => `<div>${escapeHtml(p)}</div>`).join('')}
+          <div class="${conclusionClass}">
+            结论：${conclusionText}
+          </div>
+          <div style="font-size: 10px; color: #999; margin-top: 6px;">
+            点评时间：${formatDate(teacherComment.updatedAt)}
+          </div>
+        </div>
+      `
+    }
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>旁站训练复盘报告 - ${escapeHtml(traineeName)}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: -apple-system, "Noto Sans SC", sans-serif; font-size: 12px; line-height: 1.6; color: #333; padding: 20px; }
+          h1 { font-size: 18px; text-align: center; margin-bottom: 4px; color: #2B5EA7; }
+          h2 { font-size: 14px; margin-top: 16px; margin-bottom: 8px; color: #FF6B35; border-bottom: 2px solid #FF6B35; padding-bottom: 4px; }
+          h3 { font-size: 13px; margin-top: 12px; margin-bottom: 6px; color: #4A4A4A; }
+          .header { text-align: center; border-bottom: 2px solid #2B5EA7; padding-bottom: 12px; margin-bottom: 12px; }
+          .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+          .info-item { display: flex; }
+          .info-label { color: #666; width: 70px; }
+          .info-value { font-weight: 500; color: #333; }
+          .score-box { text-align: center; margin: 16px 0; }
+          .score-number { font-size: 48px; font-weight: bold; color: ${scoreColor}; }
+          .score-rating { font-size: 14px; color: ${scoreColor}; }
+          .error { background: #fef2f2; border-left: 3px solid #dc2626; padding: 6px 8px; margin-bottom: 4px; }
+          .warning { background: #fffbeb; border-left: 3px solid #d97706; padding: 6px 8px; margin-bottom: 4px; }
+          .action-item { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px dashed #ddd; }
+          .action-checkbox { width: 16px; height: 16px; border: 1px solid #999; border-radius: 3px; flex-shrink: 0; margin-top: 2px; }
+          .action-done { text-decoration: line-through; color: #999; }
+          .comment { background: #eff6ff; border-left: 3px solid #2B5EA7; padding: 10px; margin-top: 8px; }
+          .conclusion { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; margin-top: 4px; }
+          .pass { background: #dcfce7; color: #15803d; }
+          .fail { background: #fee2e2; color: #b91c1c; }
+          .footer { margin-top: 24px; text-align: center; font-size: 10px; color: #999; }
+          @media print { body { padding: 10px; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>混凝土浇筑旁站训练复盘报告</h1>
+          <div style="font-size: 12px; color: #666; margin-top: 4px;">
+            旁站职责情景训练 · 整改清单
+          </div>
+        </div>
+
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="info-label">学员姓名：</span>
+            <span class="info-value">${escapeHtml(traineeName)}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">训练场景：</span>
+            <span class="info-value">${escapeHtml(scenarioName)}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">训练模式：</span>
+            <span class="info-value">${trainingModeLabels[mode]}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">总用时：</span>
+            <span class="info-value">${formatDuration(totalTime)}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">完成时间：</span>
+            <span class="info-value">${formatDate(completedAt)}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">题目数量：</span>
+            <span class="info-value">${record.totalEvents} 题</span>
+          </div>
+        </div>
+
+        <div class="score-box">
+          <div class="score-number">${score}</div>
+          <div class="score-rating">${scoreRating}</div>
+        </div>
+
+        ${issuesHtml}
+        ${actionItemsHtml}
+        ${commentHtml}
+
+        <div class="footer">
+          本报告由混凝土浇筑旁站情景练习系统自动生成 · ${new Date().toLocaleString('zh-CN')}
+        </div>
+      </body>
+      </html>
+    `
+
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+
+    printWindow.document.write(htmlContent)
+    printWindow.document.close()
+    printWindow.focus()
+    setTimeout(() => {
+      printWindow.print()
+    }, 250)
+  }
+
+  return (
+    <button
+      onClick={handlePrint}
+      disabled={!record}
+      className={cn(
+        'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+        record
+          ? 'bg-[#2B5EA7]/10 text-[#2B5EA7] hover:bg-[#2B5EA7]/20'
+          : 'cursor-not-allowed bg-gray-200 text-gray-400'
+      )}
+    >
+      <Printer className="h-3.5 w-3.5" />
+      打印 / 导出
+    </button>
+  )
+}
+
 export default function ResultReview() {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
@@ -426,6 +789,7 @@ export default function ResultReview() {
     restartScenario,
     trainingRecords,
     trainingMode,
+    saveTeacherComment,
   } = useStore()
   const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set())
   const [showStats, setShowStats] = useState(false)
@@ -491,6 +855,12 @@ export default function ResultReview() {
     navigate(`/scenario/${id}`)
   }
 
+  const handleSaveComment = (comment: string, passed: boolean) => {
+    const rid = selectedRecordId
+    if (!rid) return
+    saveTeacherComment(rid, comment, passed)
+  }
+
   return (
     <div className="min-h-screen pb-28" style={{ background: '#F5F5F0' }}>
       <div className="sticky top-0 z-10 border-b border-gray-200 bg-white/80 backdrop-blur-sm">
@@ -503,12 +873,15 @@ export default function ResultReview() {
               <Home className="h-4 w-4" />
               返回首页
             </button>
-            {isFromRecord && (
-              <span className="flex items-center gap-1.5 text-xs text-gray-400">
-                <Clock className="h-3.5 w-3.5" />
-                历史记录 · {currentRecord ? formatDate(currentRecord.completedAt) : ''}
-              </span>
-            )}
+            <div className="flex items-center gap-3">
+              <ExportPrintButton record={currentRecord} scenarioName={scenario.name} />
+              {isFromRecord && (
+                <span className="flex items-center gap-1.5 text-xs text-gray-400">
+                  <Clock className="h-3.5 w-3.5" />
+                  历史记录 · {currentRecord ? formatDateShort(currentRecord.completedAt) : ''}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -517,7 +890,14 @@ export default function ResultReview() {
         <h1 className="text-xl font-bold" style={{ color: '#4A4A4A' }}>
           旁站复盘报告
         </h1>
-        <p className="mt-1 text-sm text-gray-500">{scenario.name}</p>
+        <p className="mt-1 text-sm text-gray-500">
+          {currentRecord?.traineeName && (
+            <span className="mr-1">
+              <User className="inline h-3.5 w-3.5" /> {currentRecord.traineeName}
+            </span>
+          )}
+          {scenario.name}
+        </p>
       </header>
 
       <section className="mx-4 mt-4 p-6 bg-white rounded-2xl shadow-sm flex flex-col items-center">
@@ -540,6 +920,18 @@ export default function ResultReview() {
             <ModeIcon className="h-3 w-3" />
             {trainingModeLabels[displayMode]}
           </span>
+          {currentRecord?.teacherComment &&
+            (currentRecord.teacherComment.passed ? (
+              <span className="flex items-center gap-0.5 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700">
+                <CheckCircle2 className="h-2.5 w-2.5" />
+                通过
+              </span>
+            ) : (
+              <span className="flex items-center gap-0.5 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">
+                <XCircle className="h-2.5 w-2.5" />
+                待改进
+              </span>
+            ))}
         </div>
         <div className="mt-2 flex items-center gap-3 text-xs text-gray-400">
           <span className="flex items-center gap-1">
@@ -669,6 +1061,10 @@ export default function ResultReview() {
           onToggle={handleToggleActionItem}
           recordId={selectedRecordId}
         />
+      </section>
+
+      <section className="mx-4 mt-4">
+        <TeacherCommentSection record={currentRecord} onSave={handleSaveComment} />
       </section>
 
       {hasAnyIssue && (

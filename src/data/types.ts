@@ -89,11 +89,25 @@ export interface ActionItem {
   completed: boolean
 }
 
+export interface Trainee {
+  id: string
+  name: string
+  createdAt: number
+}
+
+export interface TeacherComment {
+  comment: string
+  passed: boolean
+  updatedAt: number
+}
+
 export interface TrainingRecord {
   id: string
   scenarioId: string
   scenarioName: string
   mode: TrainingMode
+  traineeId: string | null
+  traineeName: string | null
   score: number
   completedAt: number
   totalEvents: number
@@ -101,11 +115,16 @@ export interface TrainingRecord {
   perEventTime: Record<string, number>
   answers: UserAnswer[]
   scoreResult: ScoreResult
+  teacherComment: TeacherComment | null
+  sessionId: string
 }
 
 export interface InProgressState {
   scenarioId: string
   mode: TrainingMode
+  traineeId: string | null
+  traineeName: string | null
+  sessionId: string
   currentEventIndex: number
   answers: UserAnswer[]
   startTime: number
