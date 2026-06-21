@@ -32,6 +32,9 @@ import {
   ThumbsUp,
   ThumbsDown,
   Save,
+  ClipboardList,
+  Copy,
+  CheckCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/store/useStore'
@@ -573,6 +576,155 @@ function TeacherCommentSection({
   )
 }
 
+function TeachingOutlineSection({
+  record,
+  scenarioName,
+}: {
+  record: TrainingRecord | null
+  scenarioName: string
+}) {
+  const [copied, setCopied] = useState(false)
+
+  if (!record) return null
+
+  const issues = record.scoreResult.issues || []
+  const actionItems = record.scoreResult.actionItems || []
+  const teacherComment = record.teacherComment
+  const errors = issues.filter((i) => i.type === 'error')
+  const warnings = issues.filter((i) => i.type === 'warning')
+  const pendingItems = actionItems.filter((a) => !a.completed)
+  const traineeName = record.traineeName || '该学员'
+
+  const lines: string[] = []
+  lines.push(`【${traineeName} · ${scenarioName} · ${trainingModeLabels[record.mode]}】讲评提纲`)
+  lines.push('')
+
+  lines.push(`一、训练概况`)
+  lines.push(`  得分：${record.score}分（${getScoreRating(record.score)}）`)
+  lines.push(`  用时：${formatDuration(record.totalTime)}，共${record.totalEvents}题`)
+  lines.push('')
+
+  if (errors.length > 0) {
+    lines.push(`二、错题讲评（${errors.length}处）`)
+    errors.forEach((e, i) => {
+      lines.push(`  ${i + 1}.【${categoryLabels[e.category]}】${e.description}`)
+      lines.push(`    规范依据：${e.regulation}`)
+    })
+    lines.push('')
+  }
+
+  if (warnings.length > 0) {
+    const label = errors.length > 0 ? '三' : '二'
+    lines.push(`${label}、待改进项（${warnings.length}处）`)
+    warnings.forEach((w, i) => {
+      lines.push(`  ${i + 1}.【${categoryLabels[w.category]}】${w.description}`)
+    })
+    lines.push('')
+  }
+
+  if (pendingItems.length > 0) {
+    const sectionIdx = [errors.length > 0, warnings.length > 0].filter(Boolean).length
+    const label = ['二', '三', '四'][sectionIdx]
+    lines.push(`${label}、整改待办（${pendingItems.length}项未完成）`)
+    pendingItems.forEach((a, i) => {
+      lines.push(`  ${i + 1}.【${actionItemTypeLabels[a.type]}】${a.title}：${a.content}`)
+    })
+    lines.push('')
+  }
+
+  if (teacherComment) {
+    const sectionIdx = [errors.length > 0, warnings.length > 0, pendingItems.length > 0].filter(Boolean).length
+    const label = ['二', '三', '四', '五'][sectionIdx]
+    lines.push(`${label}、老师点评`)
+    lines.push(`  ${teacherComment.comment}`)
+    lines.push(`  结论：${teacherComment.passed ? '通过' : '待改进'}`)
+    lines.push('')
+  }
+
+  const outlineText = lines.join('\n')
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(outlineText)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      const textarea = document.createElement('textarea')
+      textarea.value = outlineText
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  const hasContent = errors.length > 0 || warnings.length > 0 || pendingItems.length > 0 || teacherComment
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="bg-gradient-to-r from-purple-50 to-transparent px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-600/10 text-purple-600">
+              <ClipboardList className="h-5 w-5" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-semibold text-[#4A4A4A]">带教讲评提纲</p>
+              <div className="text-[11px] text-gray-400">
+                自动生成，可复制到班会记录
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={handleCopy}
+            disabled={!hasContent}
+            className={cn(
+              'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+              hasContent
+                ? copied
+                  ? 'bg-green-100 text-green-700'
+                  : 'bg-purple-600/10 text-purple-600 hover:bg-purple-600/20'
+                : 'cursor-not-allowed bg-gray-200 text-gray-400'
+            )}
+          >
+            {copied ? (
+              <>
+                <CheckCheck className="h-3.5 w-3.5" />
+                已复制
+              </>
+            ) : (
+              <>
+                <Copy className="h-3.5 w-3.5" />
+                复制提纲
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {hasContent && (
+        <div className="px-4 pb-4 pt-3">
+          <pre className="whitespace-pre-wrap rounded-lg bg-[#F5F5F0] p-3 text-xs leading-relaxed text-[#4A4A4A] font-sans">
+            {outlineText}
+          </pre>
+        </div>
+      )}
+
+      {!hasContent && (
+        <div className="px-4 pb-4 pt-3">
+          <p className="text-xs text-gray-400 text-center py-2">
+            完成练习并填写老师点评后，讲评提纲将自动生成
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ExportPrintButton({
   record,
   scenarioName,
@@ -1065,6 +1217,10 @@ export default function ResultReview() {
 
       <section className="mx-4 mt-4">
         <TeacherCommentSection record={currentRecord} onSave={handleSaveComment} />
+      </section>
+
+      <section className="mx-4 mt-4">
+        <TeachingOutlineSection record={currentRecord} scenarioName={scenario.name} />
       </section>
 
       {hasAnyIssue && (

@@ -33,6 +33,9 @@ import {
   UserCheck,
   CheckCircle2,
   XCircle,
+  TrendingUp,
+  ArrowRight,
+  AlertTriangle,
 } from 'lucide-react'
 import { scenarios } from '@/data/scenarios'
 import type {
@@ -366,6 +369,106 @@ function TraineeSelector() {
         {trainees.length === 0 && (
           <p className="py-2 text-sm text-gray-400">还未添加学员，点击"新增学员"录入班组人员</p>
         )}
+      </div>
+    </div>
+  )
+}
+
+function TeamDashboard() {
+  const navigate = useNavigate()
+  const trainees = useStore((s) => s.trainees)
+  const trainingRecords = useStore((s) => s.trainingRecords)
+
+  const traineeStats = useMemo(() => {
+    return trainees.map((t) => {
+      const records = trainingRecords.filter((r) => r.traineeId === t.id)
+      const sortedRecords = [...records].sort((a, b) => b.completedAt - a.completedAt)
+      const lastRecord = sortedRecords[0] || null
+      const passCount = records.filter((r) => r.teacherComment?.passed === true).length
+      const pendingCount = records.reduce(
+        (sum, r) => sum + r.scoreResult.actionItems.filter((a) => !a.completed).length,
+        0
+      )
+      const lastScore = lastRecord?.score ?? null
+      const lastTime = lastRecord?.completedAt ?? null
+      const needsAttention = pendingCount > 0 || passCount === 0
+      return { trainee: t, records, lastScore, passCount, pendingCount, lastTime, needsAttention }
+    })
+  }, [trainees, trainingRecords])
+
+  if (trainees.length === 0) {
+    return (
+      <div className="mb-8 rounded-xl border border-dashed border-gray-300 bg-white/60 px-6 py-6 text-center backdrop-blur-sm">
+        <TrendingUp className="mx-auto mb-2 h-6 w-6 text-gray-300" />
+        <p className="text-sm text-gray-400">添加学员后可查看班组训练看板</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mb-8 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center gap-2">
+        <TrendingUp className="h-5 w-5 text-[#2B5EA7]" />
+        <h2 className="text-base font-semibold text-[#4A4A4A]">班组训练看板</h2>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {traineeStats.map(({ trainee, lastScore, passCount, pendingCount, lastTime, needsAttention }) => (
+          <button
+            key={trainee.id}
+            onClick={() => navigate(`/trainee/${trainee.id}`)}
+            className={cn(
+              'group relative rounded-xl border-2 p-3.5 text-left transition-all hover:shadow-md',
+              needsAttention
+                ? 'border-orange-300 bg-orange-50/50 hover:border-[#FF6B35]'
+                : 'border-gray-200 bg-white hover:border-[#2B5EA7]/40'
+            )}
+          >
+            {needsAttention && (
+              <div className="absolute right-2 top-2">
+                <AlertTriangle className="h-4 w-4 text-[#FF6B35]" />
+              </div>
+            )}
+            <div className="flex items-center gap-2 mb-2.5">
+              <div
+                className={cn(
+                  'flex h-8 w-8 items-center justify-center rounded-lg',
+                  needsAttention ? 'bg-orange-100' : 'bg-[#2B5EA7]/10'
+                )}
+              >
+                <UserCheck className={cn('h-4 w-4', needsAttention ? 'text-[#FF6B35]' : 'text-[#2B5EA7]')} />
+              </div>
+              <span className="text-sm font-bold text-[#4A4A4A] truncate">{trainee.name}</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div>
+                <p className="text-[10px] text-gray-400">最近得分</p>
+                <p className={cn('text-base font-bold', lastScore !== null ? getScoreColor(lastScore) : 'text-gray-300')}>
+                  {lastScore !== null ? lastScore : '-'}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] text-gray-400">通过</p>
+                <p className={cn('text-base font-bold', passCount > 0 ? 'text-green-600' : 'text-gray-300')}>
+                  {passCount}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] text-gray-400">待整改</p>
+                <p className={cn('text-base font-bold', pendingCount > 0 ? 'text-red-600' : 'text-gray-300')}>
+                  {pendingCount}
+                </p>
+              </div>
+            </div>
+            {lastTime !== null && (
+              <p className="mt-2 text-[10px] text-gray-400">
+                最近训练：{formatDate(lastTime)}
+              </p>
+            )}
+            <div className="absolute bottom-3 right-3 opacity-0 transition-opacity group-hover:opacity-100">
+              <ArrowRight className="h-4 w-4 text-gray-400" />
+            </div>
+          </button>
+        ))}
       </div>
     </div>
   )
@@ -739,6 +842,7 @@ export default function ScenarioSelect() {
         </header>
 
         <TraineeSelector />
+        <TeamDashboard />
         <TrainingModeSelector />
 
         <section className="mb-8">

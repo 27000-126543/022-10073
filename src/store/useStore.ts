@@ -99,7 +99,7 @@ function mergeRecordFields(
             : existing.scoreResult.issues,
       }
     } else if (k === 'teacherComment') {
-      if (partial.teacherComment !== undefined) {
+      if (partial.teacherComment !== null || existing.teacherComment === null) {
         result.teacherComment = partial.teacherComment
       }
     } else if (partial[k] !== undefined) {
@@ -111,22 +111,9 @@ function mergeRecordFields(
 
 function upsertRecord(
   records: TrainingRecord[],
-  record: TrainingRecord,
-  checkSessionId = true
+  record: TrainingRecord
 ): TrainingRecord[] {
-  let idx = -1
-  if (checkSessionId) {
-    idx = records.findIndex((r) => r.sessionId === record.sessionId)
-  }
-  if (idx === -1) {
-    idx = records.findIndex(
-      (r) =>
-        r.id === record.id ||
-        (r.scenarioId === record.scenarioId &&
-          r.traineeId === record.traineeId &&
-          Math.abs(r.completedAt - record.completedAt) < 5000)
-    )
-  }
+  const idx = records.findIndex((r) => r.sessionId === record.sessionId)
 
   let newRecords: TrainingRecord[]
   if (idx >= 0) {
@@ -373,6 +360,9 @@ export const useStore = create<AppState>((set, get) => ({
     } = get()
     if (!selectedScenarioId || !scoreResult) return
 
+    const alreadySaved = trainingRecords.some((r) => r.sessionId === sessionId)
+    if (alreadySaved) return
+
     const scenario = scenarios.find((s) => s.id === selectedScenarioId)
     if (!scenario) return
 
@@ -403,7 +393,7 @@ export const useStore = create<AppState>((set, get) => ({
       sessionId,
     }
 
-    const newRecords = upsertRecord(trainingRecords, record, true)
+    const newRecords = upsertRecord(trainingRecords, record)
     saveRecords(newRecords)
     set({ trainingRecords: newRecords, selectedRecordId: record.id })
   },
