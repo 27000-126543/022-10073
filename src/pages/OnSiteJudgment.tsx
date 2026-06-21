@@ -13,13 +13,19 @@ import {
   AlertCircle,
   Save,
   Home,
+  Clock,
+  Lightbulb,
+  GraduationCap,
+  Crosshair,
+  ClipboardCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/store/useStore'
 import { events } from '@/data/events'
 import { scenarios } from '@/data/scenarios'
-import { categoryLabels } from '@/data/types'
-import type { EventCategory } from '@/data/types'
+import { categoryLabels, trainingModeLabels } from '@/data/types'
+import type { EventCategory, TrainingMode } from '@/data/types'
+import { getHintForEvent } from '@/data/scoring'
 
 const categoryBadgeStyles: Record<EventCategory, string> = {
   material: 'bg-blue-100 text-blue-800',
@@ -28,7 +34,26 @@ const categoryBadgeStyles: Record<EventCategory, string> = {
   record: 'bg-green-100 text-green-800',
 }
 
+const modeIcons: Record<TrainingMode, React.ComponentType<{ className?: string }>> = {
+  beginner: GraduationCap,
+  focus: Crosshair,
+  exam: ClipboardCheck,
+}
+
+const modeColors: Record<TrainingMode, { bg: string; text: string }> = {
+  beginner: { bg: 'bg-blue-50', text: 'text-blue-700' },
+  focus: { bg: 'bg-orange-50', text: 'text-[#FF6B35]' },
+  exam: { bg: 'bg-purple-50', text: 'text-purple-700' },
+}
+
 const MIN_REASON_LENGTH = 5
+
+function formatDuration(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000)
+  const mins = Math.floor(totalSeconds / 60)
+  const secs = totalSeconds % 60
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+}
 
 export default function OnSiteJudgment() {
   const navigate = useNavigate()
@@ -42,7 +67,11 @@ export default function OnSiteJudgment() {
     selectedScenarioId,
     selectScenario,
     inProgressState,
+    trainingMode,
+    startTime,
   } = useStore()
+
+  const [elapsedTime, setElapsedTime] = useState(0)
 
   const scenarioEvents = events.filter((e) => e.scenarioId === scenarioId)
   const scenario = scenarios.find((s) => s.id === scenarioId)
@@ -59,6 +88,18 @@ export default function OnSiteJudgment() {
   const [isAnimating, setIsAnimating] = useState(false)
   const [showReasonError, setShowReasonError] = useState(false)
 
+  const hint = currentEvent ? getHintForEvent(currentEvent, trainingMode) : null
+
+  useEffect(() => {
+    if (!startTime) return
+    const tick = () => {
+      setElapsedTime(Date.now() - startTime)
+    }
+    tick()
+    const timer = setInterval(tick, 1000)
+    return () => clearInterval(timer)
+  }, [startTime])
+
   useEffect(() => {
     if (!scenarioId || selectedScenarioId === scenarioId) return
     selectScenario(scenarioId, true)
@@ -74,6 +115,12 @@ export default function OnSiteJudgment() {
     }
     setShowReasonError(false)
   }, [currentEventIndex, existingAnswer])
+
+  useEffect(() => {
+    if (currentEvent && !inProgressState?.perEventStartTime[currentEvent.id]) {
+      setEventIndex(currentEventIndex, currentEvent.id)
+    }
+  }, [currentEventIndex, currentEvent])
 
   const isFirstStep = currentEventIndex === 0
   const isLastStep = currentEventIndex === totalEvents - 1
@@ -108,7 +155,8 @@ export default function OnSiteJudgment() {
 
       setTimeout(() => {
         const nextIndex = direction === 'next' ? currentEventIndex + 1 : currentEventIndex - 1
-        setEventIndex(nextIndex)
+        const nextEvent = scenarioEvents[nextIndex]
+        setEventIndex(nextIndex, nextEvent?.id)
         setSlideDirection(null)
         setIsAnimating(false)
       }, 250)
@@ -127,6 +175,7 @@ export default function OnSiteJudgment() {
       calculateResult,
       navigate,
       scenarioId,
+      scenarioEvents,
     ]
   )
 
@@ -142,7 +191,11 @@ export default function OnSiteJudgment() {
     )
   }
 
-  const progressPct = Math.round(((currentEventIndex + (existingAnswer ? 1 : 0)) / totalEvents) * 100)
+  const progressPct = Math.round(
+    ((currentEventIndex + (existingAnswer ? 1 : 0)) / totalEvents) * 100
+  )
+
+  const ModeIcon = modeIcons[trainingMode]
 
   return (
     <div className="min-h-screen bg-[#F5F5F0]">
@@ -156,9 +209,15 @@ export default function OnSiteJudgment() {
               <Home className="h-4 w-4" />
               返回首页
             </button>
-            <div className="flex items-center gap-2 text-xs text-gray-400">
-              <Save className="h-3.5 w-3.5" />
-              自动保存中
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                <Clock className="h-3.5 w-3.5" />
+                {formatDuration(elapsedTime)}
+              </div>
+              <div className="flex items-center gap-1 text-xs text-gray-400">
+                <Save className="h-3.5 w-3.5" />
+                自动保存
+              </div>
             </div>
           </div>
         </div>
@@ -167,10 +226,20 @@ export default function OnSiteJudgment() {
       <div className="mx-auto max-w-2xl px-4 py-5">
         <div className="mb-4 rounded-xl bg-white p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-semibold text-[#4A4A4A]">{scenario.name}</span>
               <span className="rounded-full bg-[#FF6B35]/10 px-2 py-0.5 text-[10px] font-medium text-[#FF6B35]">
                 旁站进行中
+              </span>
+              <span
+                className={cn(
+                  'flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium',
+                  modeColors[trainingMode].bg,
+                  modeColors[trainingMode].text
+                )}
+              >
+                <ModeIcon className="h-3 w-3" />
+                {trainingModeLabels[trainingMode]}
               </span>
             </div>
             <span className="text-sm font-medium text-[#4A4A4A]">
@@ -251,19 +320,31 @@ export default function OnSiteJudgment() {
         >
           <div className="mb-4 flex items-start justify-between">
             <h2 className="text-xl font-bold text-[#4A4A4A]">{currentEvent.title}</h2>
-            <span
-              className={cn(
-                'shrink-0 rounded-full px-3 py-1 text-xs font-medium',
-                categoryBadgeStyles[currentEvent.category]
-              )}
-            >
-              {categoryLabels[currentEvent.category]}
-            </span>
+            <div className="flex shrink-0 items-center gap-2">
+              <span
+                className={cn(
+                  'rounded-full px-3 py-1 text-xs font-medium',
+                  categoryBadgeStyles[currentEvent.category]
+                )}
+              >
+                {categoryLabels[currentEvent.category]}
+              </span>
+            </div>
           </div>
 
           <p className="mb-6 text-[15px] leading-relaxed text-gray-600">
             {currentEvent.description}
           </p>
+
+          {hint && (
+            <div className="mb-4 flex items-start gap-2 rounded-lg border border-yellow-200 bg-yellow-50/60 p-3">
+              <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-yellow-600" />
+              <div>
+                <p className="text-xs font-medium text-yellow-700">新手提示</p>
+                <p className="mt-0.5 text-[13px] leading-relaxed text-yellow-800/90">{hint}</p>
+              </div>
+            </div>
+          )}
 
           <div className="mb-6 space-y-2.5">
             <p className="text-sm font-medium text-[#4A4A4A]">选择你的处置动作：</p>
