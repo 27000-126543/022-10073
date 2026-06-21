@@ -1,6 +1,19 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { CheckCircle, Circle, ChevronLeft, ChevronRight } from 'lucide-react'
+import {
+  CheckCircle,
+  Circle,
+  ChevronLeft,
+  ChevronRight,
+  Sun,
+  MapPin,
+  Droplet,
+  Truck,
+  Users,
+  AlertCircle,
+  Save,
+  Home,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/store/useStore'
 import { events } from '@/data/events'
@@ -15,10 +28,21 @@ const categoryBadgeStyles: Record<EventCategory, string> = {
   record: 'bg-green-100 text-green-800',
 }
 
+const MIN_REASON_LENGTH = 5
+
 export default function OnSiteJudgment() {
   const navigate = useNavigate()
   const { scenarioId } = useParams<{ scenarioId: string }>()
-  const { currentEventIndex, answers, setEventIndex, submitAnswer, calculateResult } = useStore()
+  const {
+    currentEventIndex,
+    answers,
+    setEventIndex,
+    submitAnswer,
+    calculateResult,
+    selectedScenarioId,
+    selectScenario,
+    inProgressState,
+  } = useStore()
 
   const scenarioEvents = events.filter((e) => e.scenarioId === scenarioId)
   const scenario = scenarios.find((s) => s.id === scenarioId)
@@ -33,6 +57,12 @@ export default function OnSiteJudgment() {
   const [reasonInput, setReasonInput] = useState('')
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null)
   const [isAnimating, setIsAnimating] = useState(false)
+  const [showReasonError, setShowReasonError] = useState(false)
+
+  useEffect(() => {
+    if (!scenarioId || selectedScenarioId === scenarioId) return
+    selectScenario(scenarioId, true)
+  }, [scenarioId, selectedScenarioId, selectScenario, inProgressState])
 
   useEffect(() => {
     if (existingAnswer) {
@@ -42,21 +72,29 @@ export default function OnSiteJudgment() {
       setSelectedAction(null)
       setReasonInput('')
     }
+    setShowReasonError(false)
   }, [currentEventIndex, existingAnswer])
 
   const isFirstStep = currentEventIndex === 0
   const isLastStep = currentEventIndex === totalEvents - 1
-  const canGoNext = selectedAction !== null
+  const reasonValid = reasonInput.trim().length >= MIN_REASON_LENGTH
+  const canGoNext = selectedAction !== null && reasonValid
 
   const handleNavigate = useCallback(
     (direction: 'prev' | 'next') => {
       if (isAnimating) return
-
       if (direction === 'prev' && isFirstStep) return
-      if (direction === 'next' && !canGoNext) return
+
+      if (direction === 'next') {
+        if (selectedAction === null) return
+        if (!reasonValid) {
+          setShowReasonError(true)
+          return
+        }
+      }
 
       if (direction === 'next' && currentEvent) {
-        submitAnswer(currentEvent.id, selectedAction!, reasonInput)
+        submitAnswer(currentEvent.id, selectedAction!, reasonInput.trim())
       }
 
       if (direction === 'next' && isLastStep) {
@@ -79,18 +117,22 @@ export default function OnSiteJudgment() {
       isAnimating,
       isFirstStep,
       isLastStep,
-      canGoNext,
-      currentEvent,
       selectedAction,
+      reasonValid,
+      currentEvent,
       reasonInput,
       currentEventIndex,
       submitAnswer,
+      setEventIndex,
       calculateResult,
       navigate,
       scenarioId,
-      setEventIndex,
     ]
   )
+
+  const handleBackHome = () => {
+    navigate('/')
+  }
 
   if (!currentEvent || !scenario) {
     return (
@@ -100,16 +142,77 @@ export default function OnSiteJudgment() {
     )
   }
 
+  const progressPct = Math.round(((currentEventIndex + (existingAnswer ? 1 : 0)) / totalEvents) * 100)
+
   return (
     <div className="min-h-screen bg-[#F5F5F0]">
-      <div className="mx-auto max-w-2xl px-4 py-6">
-        <div className="mb-4">
-          <div className="mb-2 flex items-center justify-between">
+      <div className="sticky top-0 z-10 border-b border-gray-200 bg-white/80 backdrop-blur-sm">
+        <div className="mx-auto max-w-2xl px-4 py-3">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={handleBackHome}
+              className="flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-[#4A4A4A]"
+            >
+              <Home className="h-4 w-4" />
+              返回首页
+            </button>
+            <div className="flex items-center gap-2 text-xs text-gray-400">
+              <Save className="h-3.5 w-3.5" />
+              自动保存中
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-2xl px-4 py-5">
+        <div className="mb-4 rounded-xl bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-[#4A4A4A]">{scenario.name}</span>
+              <span className="rounded-full bg-[#FF6B35]/10 px-2 py-0.5 text-[10px] font-medium text-[#FF6B35]">
+                旁站进行中
+              </span>
+            </div>
             <span className="text-sm font-medium text-[#4A4A4A]">
-              步骤 {currentEventIndex + 1}/{totalEvents}
+              {currentEventIndex + 1}/{totalEvents}
             </span>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+            <div
+              className="h-full rounded-full bg-[#FF6B35] transition-all duration-300"
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+            <div className="flex items-center gap-1.5 text-gray-500">
+              <Sun className="h-3.5 w-3.5 shrink-0 text-[#FF6B35]" />
+              <span className="truncate">{scenario.weather}</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-gray-500">
+              <MapPin className="h-3.5 w-3.5 shrink-0 text-[#2B5EA7]" />
+              <span className="truncate">{scenario.pourPart}</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-gray-500">
+              <Droplet className="h-3.5 w-3.5 shrink-0 text-green-600" />
+              <span className="truncate">{scenario.concreteGrade}</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-gray-500">
+              <Truck className="h-3.5 w-3.5 shrink-0 text-purple-600" />
+              <span className="truncate">{scenario.pumpMethod}</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-gray-500 col-span-2">
+              <Users className="h-3.5 w-3.5 shrink-0 text-gray-500" />
+              <span className="truncate">{scenario.personnelConfig}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-4">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-sm font-medium text-[#4A4A4A]">时间线进度</span>
+          </div>
+          <div className="flex items-center gap-1">
             {scenarioEvents.map((evt, idx) => {
               const isCompleted = idx < currentEventIndex
               const isCurrent = idx === currentEventIndex
@@ -120,31 +223,21 @@ export default function OnSiteJudgment() {
                   {idx > 0 && (
                     <div
                       className={cn(
-                        'h-0.5 w-3',
+                        'h-0.5 w-2 flex-1',
                         idx <= currentEventIndex ? 'bg-[#FF6B35]' : 'bg-gray-300'
                       )}
                     />
                   )}
                   {isCompleted || (isCurrent && hasAnswer) ? (
-                    <CheckCircle className="h-4 w-4 text-[#FF6B35]" />
+                    <CheckCircle className="h-4 w-4 shrink-0 text-[#FF6B35]" />
                   ) : isCurrent ? (
-                    <Circle className="h-4 w-4 fill-[#FF6B35] text-[#FF6B35]" />
+                    <Circle className="h-4 w-4 shrink-0 fill-[#FF6B35] text-[#FF6B35]" />
                   ) : (
-                    <Circle className="h-4 w-4 text-gray-300" />
+                    <Circle className="h-4 w-4 shrink-0 text-gray-300" />
                   )}
                 </div>
               )
             })}
-          </div>
-        </div>
-
-        <div className="mb-4 rounded-lg bg-white px-4 py-2.5 shadow-sm">
-          <div className="flex items-center gap-3 text-sm text-[#4A4A4A]">
-            <span className="font-medium">{scenario.name}</span>
-            <span className="text-gray-400">|</span>
-            <span>{scenario.weather}</span>
-            <span className="text-gray-400">|</span>
-            <span>{scenario.concreteGrade}</span>
           </div>
         </div>
 
@@ -173,10 +266,14 @@ export default function OnSiteJudgment() {
           </p>
 
           <div className="mb-6 space-y-2.5">
+            <p className="text-sm font-medium text-[#4A4A4A]">选择你的处置动作：</p>
             {currentEvent.actionOptions.map((option, idx) => (
               <button
                 key={idx}
-                onClick={() => setSelectedAction(idx)}
+                onClick={() => {
+                  setSelectedAction(idx)
+                  setShowReasonError(false)
+                }}
                 className={cn(
                   'flex w-full items-center gap-3 rounded-lg border-2 px-4 py-3 text-left transition-all hover:border-[#FF6B35]/50 hover:bg-orange-50/30',
                   selectedAction === idx
@@ -207,18 +304,37 @@ export default function OnSiteJudgment() {
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-[#4A4A4A]">
-              简述你的判断理由
-            </label>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="text-sm font-medium text-[#4A4A4A]">
+                简述你的判断理由 <span className="text-[#FF6B35]">*</span>
+              </label>
+              {showReasonError && (
+                <span className="flex items-center gap-1 text-xs text-red-500">
+                  <AlertCircle className="h-3.5 w-3.5" />
+                  请填写至少{MIN_REASON_LENGTH}字的理由
+                </span>
+              )}
+            </div>
             <textarea
               value={reasonInput}
-              onChange={(e) => setReasonInput(e.target.value)}
-              placeholder="请输入你选择该动作的理由..."
+              onChange={(e) => {
+                setReasonInput(e.target.value)
+                if (showReasonError && e.target.value.trim().length >= MIN_REASON_LENGTH) {
+                  setShowReasonError(false)
+                }
+              }}
+              placeholder="请输入你选择该动作的理由，至少5字..."
               rows={3}
-              className="w-full resize-none rounded-lg border border-gray-200 px-4 py-3 text-sm text-[#4A4A4A] placeholder-gray-400 transition-colors focus:border-[#2B5EA7] focus:outline-none"
+              className={cn(
+                'w-full resize-none rounded-lg border px-4 py-3 text-sm text-[#4A4A4A] placeholder-gray-400 transition-colors focus:outline-none',
+                showReasonError
+                  ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-200'
+                  : 'border-gray-200 focus:border-[#2B5EA7]'
+              )}
             />
-            <div className="mt-1 text-right text-xs text-gray-400">
-              {reasonInput.length} 字
+            <div className="mt-1 flex justify-between text-xs text-gray-400">
+              <span>至少 {MIN_REASON_LENGTH} 字</span>
+              <span>{reasonInput.trim().length} 字</span>
             </div>
           </div>
         </div>
@@ -248,10 +364,14 @@ export default function OnSiteJudgment() {
                 : 'cursor-not-allowed bg-gray-300'
             )}
           >
-            {isLastStep ? '查看复盘结果' : '下一步'}
+            {isLastStep ? '提交并查看结果' : '下一步'}
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
+
+        <p className="mt-4 text-center text-xs text-gray-400">
+          提示：理由描述越详细，越有助于你记忆旁站要点
+        </p>
       </div>
     </div>
   )

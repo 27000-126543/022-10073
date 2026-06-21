@@ -49,6 +49,32 @@ export interface ScoreResult {
   recordScore: number
   recordMax: number
   issues: Issue[]
+  suggestions: Suggestion[]
+}
+
+export interface Suggestion {
+  category: EventCategory
+  title: string
+  content: string
+  priority: 'high' | 'medium' | 'low'
+}
+
+export interface TrainingRecord {
+  id: string
+  scenarioId: string
+  scenarioName: string
+  score: number
+  completedAt: number
+  totalEvents: number
+  answers: UserAnswer[]
+  scoreResult: ScoreResult
+}
+
+export interface InProgressState {
+  scenarioId: string
+  currentEventIndex: number
+  answers: UserAnswer[]
+  lastSavedAt: number
 }
 
 export const categoryLabels: Record<EventCategory, string> = {
@@ -56,4 +82,11 @@ export const categoryLabels: Record<EventCategory, string> = {
   quality: '质量控制',
   safety: '安全防护',
   record: '影像记录',
+}
+
+export const categoryIconNames: Record<EventCategory, string> = {
+  material: 'FileCheck',
+  quality: 'Gauge',
+  safety: 'ShieldAlert',
+  record: 'Camera',
 }
