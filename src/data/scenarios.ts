@@ -1,0 +1,48 @@
+import type { Scenario } from './types'
+
+export const scenarios: Scenario[] = [
+  {
+    id: 'basement-slab',
+    name: '地下室底板',
+    description: '大面积底板混凝土浇筑，需重点关注防水混凝土质量、连续浇筑及温控措施',
+    weather: '晴，28°C',
+    pourPart: '地下室底板',
+    concreteGrade: 'C30 P8 抗渗',
+    pumpMethod: '拖泵输送',
+    personnelConfig: '监理1人、施工员1人、质检员1人、振捣工3人',
+    icon: 'Layers',
+  },
+  {
+    id: 'frame-column',
+    name: '框架柱',
+    description: '竖向构件浇筑，需控制分层厚度、振捣密实度及模板稳定性',
+    weather: '多云，25°C',
+    pourPart: '框架柱',
+    concreteGrade: 'C40',
+    pumpMethod: '车泵布料',
+    personnelConfig: '监理1人、施工员1人、振捣工2人',
+    icon: 'Building2',
+  },
+  {
+    id: 'floor-slab',
+    name: '楼板',
+    description: '水平构件浇筑，需注意板厚控制、预埋件保护及收面质量',
+    weather: '阴，22°C',
+    pourPart: '楼板',
+    concreteGrade: 'C25',
+    pumpMethod: '车泵布料',
+    personnelConfig: '监理1人、施工员1人、振捣工2人、收面工1人',
+    icon: 'Square',
+  },
+  {
+    id: 'post-pouring',
+    name: '后浇带',
+    description: '后浇带微膨胀混凝土浇筑，需严格清理、润湿及养护',
+    weather: '晴，30°C',
+    pourPart: '后浇带',
+    concreteGrade: 'C35 微膨胀',
+    pumpMethod: '塔吊吊斗',
+    personnelConfig: '监理1人、施工员1人、振捣工1人',
+    icon: 'Split',
+  },
+]
